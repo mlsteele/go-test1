@@ -1,15 +1,12 @@
-extern crate clap;
-extern crate ignore;
-extern crate grep_searcher;
-extern crate grep_regex;
-use failure::{Error, ResultExt, format_err, bail};
+use failure::{Error, ResultExt, format_err};
 use grep_searcher::{Searcher, Sink, SinkMatch};
 use grep_regex::{RegexMatcher};
-use std::process::Command;
-use std::os::unix::process::CommandExt;
 use ignore::Walk;
 use std::io;
 use std::path::PathBuf;
+use std::fs;
+use std::io::Write;
+use tee::TeeReader;
 
 type Result<T> = std::result::Result<T, Error>;
 type EResult = std::result::Result<(), Error>;
@@ -44,11 +41,17 @@ fn main() -> EResult {
     let mut path = find_file_for_test(&name)?.ok_or_else(|| format_err!("test not found: {}", name))?;
     println!("found test in file: {}", path.display());
     path.pop();
-    Err(Command::new("go")
-        .args(&["test", "-v", "-run", &format!("^{}$",name)])
-        .current_dir(path)
-        .exec()
-    ).with_context(|_|"attempted to exec 'go test'")?;
+
+    let log_file = fs::File::create("/tmp/test.log")?;
+    let mut log_writer = io::BufWriter::new(log_file);
+    let mut reader = duct::cmd!("go", "test", "-v", "-run", &format!("^{}$",name))
+        .dir(path)
+        .stderr_to_stdout()
+        .reader()
+        .with_context(|_|"attempted to exec 'go test'")?;
+    io::copy(&mut TeeReader::new(&mut reader, &mut io::stdout()), &mut log_writer)?;
+    log_writer.flush()?;
+
     Ok(())
 }
 
