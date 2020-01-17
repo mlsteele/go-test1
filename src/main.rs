@@ -19,6 +19,10 @@ fn main() -> EResult {
         .value_name("NAME")
         .help("Name of the go test. With or without the initial 'Test'.")
         .required(true))
+    .arg(clap::Arg::with_name("log")
+        .short("l")
+        .value_name("LOG")
+        .help("File in which to save the log. Defaults to /tmp/test.log"))
     .get_matches();
 
     macro_rules! arg_value {
@@ -35,6 +39,7 @@ fn main() -> EResult {
             format!("Test{}", name)
         }
     };
+    let log_path = matches.value_of("log").unwrap_or_else(|| "/tmp/test.log");
     println!("Test name: {}", name);
     println!("Command: go test -v -run \"^{}$\"", name);
 
@@ -42,7 +47,7 @@ fn main() -> EResult {
     println!("found test in file: {}", path.display());
     path.pop();
 
-    let log_file = fs::File::create("/tmp/test.log")?;
+    let log_file = fs::File::create(log_path)?;
     let mut log_writer = io::BufWriter::new(log_file);
     let mut reader = duct::cmd!("go", "test", "-v", "-run", &format!("^{}$",name))
         .dir(path)
