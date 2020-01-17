@@ -9,3 +9,6 @@ edition = "2018"
 [dependencies]
 failure = "0.1.6"
 clap = "2.33.0"
+ignore = "0.4.11"
+grep-searcher = "0.1.6"
+grep-regex = "0.1.5"
