@@ -21,8 +21,15 @@ fn main() -> EResult {
         .required(true))
     .arg(clap::Arg::with_name("log")
         .short("l")
+        .long("log")
         .value_name("LOG")
         .help("File in which to save the log. Defaults to /tmp/test.log"))
+    .arg(clap::Arg::with_name("count")
+        .short("c")
+        .long("count")
+        .value_name("COUNT")
+        .takes_value(true)
+        .help("Run the test n times consecutively"))
     .get_matches();
 
     macro_rules! arg_value {
@@ -41,7 +48,6 @@ fn main() -> EResult {
     };
     let log_path = matches.value_of("log").unwrap_or_else(|| "/tmp/test.log");
     println!("Test name: {}", name);
-    println!("Command: go test -v -run \"^{}$\"", name);
 
     let mut path = find_file_for_test(&name)?.ok_or_else(|| format_err!("test not found: {}", name))?;
     println!("found test in file: {}", path.display());
@@ -49,7 +55,16 @@ fn main() -> EResult {
 
     let log_file = fs::File::create(log_path)?;
     let mut log_writer = io::BufWriter::new(log_file);
-    let mut reader = duct::cmd!("go", "test", "-v", "-run", &format!("^{}$",name))
+    let cmd_args = {
+        let mut cmd_args: Vec<String> = vec!["test".to_owned(), "-v".to_owned()];
+        if let Some(count) = matches.value_of("count") {
+            cmd_args.extend_from_slice(&["-count".to_owned(), count.to_owned()]);
+        }
+        cmd_args.extend_from_slice(&["-run".to_owned(), format!("^{}$",name)]);
+        cmd_args
+    };
+    println!("Command: go {}", cmd_args.join(" "));
+    let mut reader = duct::cmd("go", &cmd_args)
         .dir(path)
         .stderr_to_stdout()
         .reader()
